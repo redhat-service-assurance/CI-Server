@@ -1,0 +1,19 @@
+{
+  "name": "continuous-integration-server",
+  "version": "1.0.0",
+  "description": "",
+  "main": "express_test.js",
+  "dependencies": {
+    "express": "^4.17.1",
+    "request": "^2.88.0",
+    "simple-git": "^1.130.0",
+    "smee-client": "^1.1.0",
+    "yargs": "^15.1.0"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC"
+}
