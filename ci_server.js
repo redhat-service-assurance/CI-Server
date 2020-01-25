@@ -3,7 +3,7 @@ const request = require('request');
 const child_process = require('child_process');
 const yargs = require('yargs');
 
-var repo = '/home/pleimer/Continuous-Integration-Server/dummy';
+var repo = '/usr/src/repos';
 var apiUrl = 'https://api.github.com/repos/pleimer/dummy/statuses/'
 var app = express();
 
