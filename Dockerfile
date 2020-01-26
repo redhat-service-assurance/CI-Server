@@ -8,4 +8,4 @@ RUN npm install && \
 	mkdir -p /usr/src/repos
 EXPOSE 3000
 
-ENTRYPOINT node ci_server.js
+ENTRYPOINT npm start 

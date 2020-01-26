@@ -1,24 +1,16 @@
 const express = require('express');
 const request = require('request');
 const child_process = require('child_process');
-const yargs = require('yargs');
+const { oauth_token } = require('./config');
 
-var repo = '/usr/src/repos';
-var apiUrl = 'https://api.github.com/repos/pleimer/dummy/statuses/'
+var repoClones = '/usr/src/repos';
+var usr = 'pleimer'; // server deployment
+var repo = 'dummy'; // server deployment
+var apiUrl = 'https://api.github.com/repos/' + usr + '/' + repo + '/statused/';
 var app = express();
 
-const argv = yargs
-	.option('token', {
-			alias: 't',
-			description: 'Token for github OAuth',
-			type: 'string'
-	})
-	.help()
-	.alias('help','h')
-	.argv;
-
 var headers = {
-	'Authorization': 'token ' + argv.token,
+	'Authorization': 'token ' + oauth_token,
 	'User-Agent': 'curl/7.54'
 }
 
