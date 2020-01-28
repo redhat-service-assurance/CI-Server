@@ -11,36 +11,14 @@ function Repo({user, name} = {}){
     this.__user = user;
     this.__name = name;
 
-    // Sync branch with upstream repo 
-    this.__reconcile_branch = (callback) => {
-        child_process.exec('cd ' + this.__path + ' && git show-ref --verify --quiet ' + this.__ref, (err, stdout, stderr) => {
-            callback(err,stdout,stderr);
-        })
-        .on('exit', (code) => {
-            if (code != 0) {
-                console.log('Creating new branch ' + this.__current_branch);
-
-                child_process.exec('cd ' + this.__path + ' && git checkout --track origin/' + this.__current_branch, (err, stdout, stderr) => {
-                    callback(err,stdout,stderr);
-                })
-                .on('exit', (code) => {
-                    child_process.exec('cd ' + this.__path + ' && git pull', (err, stdout, stderr) => {
-                        callback(err,stdout,stderr);
-                    });
-                });
-            } else {
-                console.log('Updating existing branch ' + this.__current_branch);
-                child_process.exec('cd ' + this.__path + ' && git pull', (err, stdout, stderr) => {
-                    callback(err,stdout,stderr);
-                });
-            }
-        });
-    }
-
     this.__sync_branch = (callback) => {
-        child_process.exec('sh ../scripts/sync-branch.sh -p ' + this.__path + ' -r ' + this.__ref + ' -b ' + this.__current_branch, (err, stdout, stderr) => {
+        return child_process.exec('sh scripts/sync-branch.sh -p ' + this.__path + ' -r ' + this.__ref + ' -b ' + this.__current_branch, (err, stdout, stderr) => {
             callback(err, stdout, stderr);
         })
+    }
+
+    this.runCommand = (command, callback) => {
+        return child_process.exec('cd ' + this.__path + ' && ' + command, callback)
     }
 
     // sync repo to origin ref 
@@ -53,20 +31,16 @@ function Repo({user, name} = {}){
 
         if (!fs.existsSync(this.__path + name)) {
             console.log('Tracking new repository ' + this.__name)
-            child_process.exec('cd ' + this.__path + ' && git clone https://www.github.com/' + user + '/' + this.__name + '.git', (err, stdout, stderr) => {
-                callback(err, stdout, stderr);
-            })
+            child_process.exec('cd ' + this.__path + ' && git clone https://www.github.com/' + user + '/' + this.__name + '.git')
             .on('exit', (code) => {
                 this.__path = this.__path + this.__name;
-                // this.__reconcile_branch(callback);
-                this.__sync_branch(callback);
+                return this.__sync_branch(callback);
             })
         } else {
             console.log('Using existing repository "' + this.__name + '"');
 
             this.__path = this.__path + this.__name;
-            //this.__reconcile_branch(callback);
-            this.__sync_branch(callback);
+            return this.__sync_branch(callback);
         }
     }
 }
@@ -94,14 +68,25 @@ function User({oauth_token, username} = {}) {
         }
     };
 
-    this.newRepo = (repoName, callback) => {
-        this.__repos.set(repoName, new Repo({
-            user: this.__user,
-            name: repoName
-        }));
-        this.__repos.get(repoName).sync('/refs/heads/master', (err, stdout, stderr) => {
-            callback(err, stdout, stderr);
+    // register and track new repo
+    this.registerRepo = (repoName) => {
+        if (!this.__repos.has(repoName)) {
+            this.__repos.set(repoName, new Repo({
+                user: this.__user,
+                name: repoName
+            }));
+        }
+    }
+
+    this.syncRepo = ({repoName, ref} = {}, callback) => {
+        return this.__repos.get(repoName).sync(ref, (err, stdout, stderr) => {
+            callback(err,stdout,stderr);
         });
+    }
+
+    // run command in repo
+    this.runInRepo = ({repoName, command} = {}, callback) => {
+        return this.__repos.get(repoName).runCommand(command, callback);
     }
 
     this.updateStatus = ({repoName, ref, sha, status} = {}, callback) => {

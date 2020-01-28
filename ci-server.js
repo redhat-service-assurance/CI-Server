@@ -1,106 +1,72 @@
-const express = require('express');
+const express = require('express'); 
 const request = require('request');
 const child_process = require('child_process');
-const { oauth_token } = require('./pkg/config');
+const User = require('./pkg/user');
+const { oauth_token, github_user } = require('./pkg/config');
 
-var repoClones = '/usr/src/repos';
-var usr = 'pleimer'; // server deployment
-var repo = 'dummy'; // server deployment
-var apiUrl = 'https://api.github.com/repos/' + usr + '/' + repo + '/statused/';
 var app = express();
 
-var headers = {
-	'Authorization': 'token ' + oauth_token,
-	'User-Agent': 'curl/7.54'
-}
-
-function status_payload_json(state, desc) {
-	return {
-		"state": state,
-		"description": desc,
-		"target_url": "https://www.github.com",
-		"context": "Paul's CI Bot"
-	}
-}
-
-function status_payload(state) {
-	switch(state) {
-		case "success":
-			return status_payload_json(state, "All checks passed")
-		case "failure":
-			return status_payload_json(state, "Some tests failed")
-		default:
-			return null
-	}
-}
-
-function run_shell_comm(command, cb) {
-	child_process.exec(command, (err, stdout, stderr) => {
-		if (err) {
-			console.log(err);
-		}
-		console.log(command)
-		console.log(stdout + "\n")
-		console.log(stderr + "\n")
-	}).on('exit', code => cb(code));
-}
-
-function post_status_update(state) {
-	request.post({url: url, json: status_payload(state), headers: headers }, function (err, response, body) {
-		if (err) {
-			console.log("Failed to post status update to PR: " + err);
-		} else {
-			console.log("Updated status with " + state);
-		}
-	});
-}
-
-function check_branch(refs) {
-	if (!refs) {
-		console.log("No git refs specified")
-		return null
-	}
-	try{
-		child_process.execSync("cd " + repo + " && git show-ref --verify --quiet " + refs);
-	} catch(err) {
-		console.log("Creating new feature branch");
-		
-		refObj = refs.split('/');
-		branch = refObj[refObj.length - 1];
-		try{ 
-			child_process.execSync("cd " + repo + " && git checkout --track origin/" + branch);
-			console.log("Created new feature branch");
-		} catch(err) {
-			console.log("Failed to create new branch");
-		}
-	}
-}
-
-app.post('/events', function (req, res) {
-	req.on('data', function(chunk) {
-		//get feature branch
-		check_branch(JSON.parse(chunk).ref);
-		run_shell_comm('cd ' + repo + ' && git pull', function(exitStatus) {
-			//get PR url
-			url = apiUrl + JSON.parse(chunk).after;
-			console.log(url)
-
-			//run tests
-			run_shell_comm('cd ' + repo + '/tests/ && sh run.sh', function(exitCode) {
-				console.log(exitCode)
-				if(exitCode != 0) {
-					console.log("Tests failed")
-					post_status_update("failure");
-				} else {
-					console.log("Tests passed")
-					post_status_update("success")
-				}
-			});
-		});
-	});
+user = new User({
+    oauth_token: oauth_token,
+    username: github_user
 });
 
-var server = app.listen(3000, function () {
-	console.log("Listening on port 3000 for github webhooks")
+app.post('/commit', (req, res) => {
+    req.on('data', (chunk) => {
+        chunkObj = JSON.parse(chunk);
+
+        user.registerRepo(chunkObj.repository.name);
+
+        //sync repo
+        user.syncRepo({
+            repoName: chunkObj.repository.name,
+            ref: chunkObj.ref
+        }, (err, stdout, stderr) => {
+            if(err){
+                console.log("Warning: failed to sync repo " + chunkObj.repository.name +  " with " + err + " " + stderr);
+            } else {
+                console.log(stdout + stderr);
+            }
+
+            //run tests
+            user.runInRepo({
+                repoName: chunkObj.repository.name,
+                command: 'sh tests/run.sh'
+            }, (err, stdout, stderr) => {
+                console.log(stdout + stderr);
+            })
+            .on('exit', (code) => {
+
+                // post status updates
+                var status;
+                if(code != 0) {
+                    console.log('Test failed');
+                    status = "failure";
+                } else {
+                    console.log('Test passed');
+                    status = "success";
+                }
+
+                user.updateStatus({
+                    repoName: chunkObj.repository.name,
+                    ref: chunkObj.ref,
+                    sha: chunkObj.after,
+                    status: status 
+                }, (err, resp, body) => {
+                    if(err) {
+                        console.log("Error updating commit status: " + err);
+                    } else {
+                        console.log("Updated statuses");
+                    }
+                });
+            })
+            .on('error', (err) => {
+                console.log(err);
+            })
+        });
+    });
 });
 
+var server = app.listen(3000, () => {
+    console.log("Listening on port 3000 for github webhooks");
+})
