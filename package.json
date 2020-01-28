@@ -19,8 +19,10 @@
   },
   "homepage": "https://github.com/pleimer/CI-Server#readme",
   "dependencies": {
+    "@octokit/rest": "^16.38.3",
     "child_process": "^1.0.2",
     "express": "^4.17.1",
+    "octokit": "^1.0.0-hello-world",
     "request": "^2.88.0",
     "smee-client": "^1.1.0"
   }

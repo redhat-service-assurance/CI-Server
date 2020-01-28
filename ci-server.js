@@ -1,7 +1,7 @@
 const express = require('express');
 const request = require('request');
 const child_process = require('child_process');
-const { oauth_token } = require('./config');
+const { oauth_token } = require('./pkg/config');
 
 var repoClones = '/usr/src/repos';
 var usr = 'pleimer'; // server deployment
