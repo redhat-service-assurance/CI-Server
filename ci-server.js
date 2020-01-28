@@ -31,7 +31,7 @@ app.post('/commit', (req, res) => {
             //run tests
             user.runInRepo({
                 repoName: chunkObj.repository.name,
-                command: 'sh tests/run.sh'
+                command: 'sh ci.sh'
             }, (err, stdout, stderr) => {
                 console.log(stdout + stderr);
             })
