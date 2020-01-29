@@ -56,7 +56,8 @@ function User({oauth_token, username, organization} = {}) {
     this.__oauth_token = oauth_token;
     this.__base_url = 'https://api.github.com';
     this.__user = username;
-    this.__organization = organization
+    this.__organization = organization;
+    this.__gist_url;
     this.__headers = {
         'Authorization': 'token ' + this.__oauth_token,
         'User-Agent': username 
@@ -111,6 +112,8 @@ function User({oauth_token, username, organization} = {}) {
                 return;
         }
 
+        console.log(this.__gist_url)
+
         var subpath = this.__organization;
         if(!subpath){
             subpath = this.__user;
@@ -122,10 +125,33 @@ function User({oauth_token, username, organization} = {}) {
             json: {
                 'state': status,
                 'description': desc,
-                'target_url': 'https://www.redhat.com',
+                'target_url': this.__gist_url,
                 'context': 'CI Bot'
             }
         }, callback);
+    }
+
+    this.postGist = (text, callback) => {
+       this.request({
+           method: 'POST',
+           endpoint: '/gists',
+           json: {
+                'description': 'CI test results',
+                'public': true,
+                'files': {
+                    'results.txt': {
+                        'content': text
+                    }
+                }
+           }
+       }, (error, response, body) => {
+           if(!body.id){
+               callback(body);
+           } else {
+               this.__gist_url = 'https://gist.github.com/' + this.__user + '/' + body.id
+               callback(null);
+           }
+       });
     }
 
 

@@ -34,36 +34,32 @@ app.post('/commit', (req, res) => {
                 repoName: chunkObj.repository.name,
                 command: 'sh ci.sh'
             }, (err, stdout, stderr) => {
+
                 console.log(stdout + stderr);
-            })
-            .on('exit', (code) => {
-
-                // post status updates
-                var status;
-                if(code != 0) {
-                    console.log('Test failed');
-                    status = "failure";
+                if(err) {
+                    user.status = "failure";
                 } else {
-                    console.log('Test passed');
-                    status = "success";
-                }
-
-                user.updateStatus({
-                    repoName: chunkObj.repository.name,
-                    ref: chunkObj.ref,
-                    sha: chunkObj.after,
-                    status: status 
-                }, (err, resp, body) => {
-                    console.log(body.message)
-                    if(err) {
-                        console.log("Error updating commit status: " + err);
+                    user.status = "success";
+                }             
+                user.postGist("Test results\n\n" + stdout + stderr, (error) => {
+                    if(error) {
+                        console.log('Could not post test output to gist: ');
+                        console.log(error);
                     } else {
-                        console.log("Updated statuses");
+                        user.updateStatus({
+                            repoName: chunkObj.repository.name,
+                            ref: chunkObj.ref,
+                            sha: chunkObj.after,
+                            status: user.status 
+                        }, (err, resp, body) => {
+                            if(body.message) {
+                                console.log("Failed to update statuses: " + body.message);
+                            } else {
+                                console.log("Posted status updates to repo " + chunkObj.repository.name);
+                            }
+                        });
                     }
                 });
-            })
-            .on('error', (err) => {
-                console.log(err);
             })
         });
     });
