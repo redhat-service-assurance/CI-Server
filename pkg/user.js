@@ -3,13 +3,14 @@ const child_process = require('child_process');
 const fs = require('fs');
 
 // Provide functions to track remote repo in a local repo
-function Repo({user, name} = {}){
+function Repo({user, name, organization} = {}){
     var __current_branch;
     var __path; 
     var __ref;
 
     this.__user = user;
     this.__name = name;
+    this.__organization = organization;
 
     this.__sync_branch = (callback) => {
         return child_process.exec('sh scripts/sync-branch.sh -p ' + this.__path + ' -r ' + this.__ref + ' -b ' + this.__current_branch, (err, stdout, stderr) => {
@@ -28,10 +29,15 @@ function Repo({user, name} = {}){
         this.__current_branch = refObj[refObj.length - 1]
         this.__path = '/var/tmp/';
         this.__ref = ref;
+        
+        var subpath = this.__organization;
+        if(!subpath){
+            subpath = this.__user;
+        }
 
         if (!fs.existsSync(this.__path + name)) {
             console.log('Tracking new repository ' + this.__name)
-            child_process.exec('cd ' + this.__path + ' && git clone https://www.github.com/' + user + '/' + this.__name + '.git')
+            child_process.exec('cd ' + this.__path + ' && git clone https://www.github.com/' + subpath + '/' + this.__name + '.git')
             .on('exit', (code) => {
                 this.__path = this.__path + this.__name;
                 return this.__sync_branch(callback);
@@ -45,11 +51,12 @@ function Repo({user, name} = {}){
     }
 }
 
-function User({oauth_token, username} = {}) {
+function User({oauth_token, username, organization} = {}) {
     this.__repos = new Map();
     this.__oauth_token = oauth_token;
     this.__base_url = 'https://api.github.com';
     this.__user = username;
+    this.__organization = organization
     this.__headers = {
         'Authorization': 'token ' + this.__oauth_token,
         'User-Agent': username 
@@ -73,7 +80,8 @@ function User({oauth_token, username} = {}) {
         if (!this.__repos.has(repoName)) {
             this.__repos.set(repoName, new Repo({
                 user: this.__user,
-                name: repoName
+                name: repoName,
+                organization: this.__organization
             }));
         }
     }
@@ -103,9 +111,14 @@ function User({oauth_token, username} = {}) {
                 return;
         }
 
+        var subpath = this.__organization;
+        if(!subpath){
+            subpath = this.__user;
+        }
+
         this.request({
             method: 'POST',
-            endpoint: '/repos/' + this.__user + '/' + repoName + '/statuses/' + sha,
+            endpoint: '/repos/' + subpath + '/' + repoName + '/statuses/' + sha,
             json: {
                 'state': status,
                 'description': desc,
@@ -122,6 +135,8 @@ function User({oauth_token, username} = {}) {
     }, (error, response, body) => {
         if (response.headers.status != '200 OK') {
             console.log('Warning: authorization failed with message: ' + response.headers.status);
+        } else {
+            console.log("User successfully authorized");
         }
     })
 }

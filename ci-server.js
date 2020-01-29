@@ -2,13 +2,14 @@ const express = require('express');
 const request = require('request');
 const child_process = require('child_process');
 const User = require('./pkg/user');
-const { oauth_token, github_user } = require('./pkg/config');
+const { oauth_token, github_user, organization} = require('./pkg/config');
 
 var app = express();
 
 user = new User({
     oauth_token: oauth_token,
-    username: github_user
+    username: github_user,
+    organization: organization
 });
 
 app.post('/commit', (req, res) => {
@@ -53,6 +54,7 @@ app.post('/commit', (req, res) => {
                     sha: chunkObj.after,
                     status: status 
                 }, (err, resp, body) => {
+                    console.log(body.message)
                     if(err) {
                         console.log("Error updating commit status: " + err);
                     } else {
