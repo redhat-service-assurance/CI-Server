@@ -107,6 +107,9 @@ function User({oauth_token, username, organization} = {}) {
             case 'failure':
                 desc = 'Some checks failed';
                 break;
+            case 'pending':
+                desc = 'Pending';
+                break;
             default:
                 callback('Unrecognized status');
                 return;
