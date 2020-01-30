@@ -1,4 +1,4 @@
-FROM centos
+FROM centos:centos8
 ENV D=/root/
 
 ARG OC_LOC=https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest/openshift-client-linux-4.3.0.tar.gz 
@@ -6,8 +6,7 @@ ARG OC_LOC=https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest/open
 WORKDIR $D
 COPY . $D 
 
-RUN dnf install git -y && \
-    dnf install nodejs -y && \
+RUN yum install nodejs -y && \
     curl -SL $OC_LOC |\
     tar -xvz -C /usr/bin --exclude="README.md" && \
     npm install 
