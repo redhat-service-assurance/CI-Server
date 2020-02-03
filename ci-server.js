@@ -12,55 +12,51 @@ user = new User({
     organization: organization
 });
 
-function runTest(chunkObj) {
+user.getAuthStatus();
+
+async function runTest(chunkObj) {
     user.registerRepo(chunkObj.repository.name);
 
-    //sync repo
-    user.syncRepo({
+    await user.syncRepo({
         repoName: chunkObj.repository.name,
         ref: chunkObj.ref
-    }, (err, stdout, stderr) => {
-        if(err){
-            console.log("Warning: failed to sync repo " + chunkObj.repository.name +  " with " + err + " " + stderr);
-        } else {
-            console.log(stdout + stderr);
-        }
+    })    
 
-        //run tests
-        user.runInRepo({
-            repoName: chunkObj.repository.name,
-            command: 'sh ci.sh'
-        }, (err, stdout, stderr) => {
-
-            console.log(stdout + stderr);
-            if(err) {
-                user.status = "failure";
-            } else {
-                user.status = "success";
-            }             
-            user.postGist("Test results\n\n" + stdout + stderr, (error) => {
-                if(error) {
-                    console.log('Could not post test output to gist: ');
-                    console.log(error);
-                } else {
-                    user.updateStatus({
-                        repoName: chunkObj.repository.name,
-                        ref: chunkObj.ref,
-                        sha: chunkObj.after,
-                        status: user.status 
-                    }, (err, resp, body) => {
-                        if(body.message) {
-                            console.log("Failed to update statuses: " + body.message);
-                        } else {
-                            console.log("Posted status updates to repo " + chunkObj.repository.name);
-                        }
-                    });
-                }
-            });
-        })
-        .stdout.pipe(process.stdout);
+    //run tests
+    console.log("\n\nTest Output");
+    results = await user.runInRepo({
+        repoName: chunkObj.repository.name,
+        command: 'sh ci.sh'
     });
-    console.log("Test complete");
+    let end_status = "";
+    if(results.code != 0) {
+        end_status = "failure";
+    } else {
+        end_status = "success";
+    }             
+
+    console.log('Test for ' + chunkObj.repository.name + ':' + chunkObj.after + ' ended with status ' + end_status)
+    user.postGist("Test results\n\n" + results.stdout + results.stderr, (error, url) => { //Gotta get output to post to gist!
+        if(error) {
+            console.log('Could not post test output to gist: ');
+            console.log(error);
+        } else {
+            console.log("Gist available at: " + url);
+        }
+    });
+
+    user.updateStatus({
+        repoName: chunkObj.repository.name,
+        ref: chunkObj.ref,
+        sha: chunkObj.after,
+        status: end_status 
+    }).then( (data) => {
+        if(data.body.message) {
+            console.log("[CI Server] Failed to update statuses: " + body.message);
+        } else {
+            console.log("[CI Server] Posted status '" + end_status + "' to repo " + chunkObj.repository.name);
+        }
+    });
 }
 
 app.post('/commit', (req, res) => {
@@ -71,15 +67,14 @@ app.post('/commit', (req, res) => {
             ref: chunkObj.ref,
             sha: chunkObj.after,
             status: 'pending'
-        }, (err, resp, body) => {
-            if(body.message) {
-                console.log("Failed to update statuses: " + body.message);
+        }).then( (data) => {
+            if(data.body.message) {
+                console.log("[CI Server] Failed to update 'pending' statuses to " + chunkObj.repository.name + " with: " + body.message);
             } else {
-                console.log("Posted status updates to repo " + chunkObj.repository.name);
+                console.log("[CI Server] Posted status 'pending' to repo " + chunkObj.repository.name);
             }
         });
         runTest(chunkObj);
-        console.log('Waiting for new test')
     });
 });
 
