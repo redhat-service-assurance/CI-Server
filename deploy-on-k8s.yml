@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ci-server 
+  labels:
+    app: ci 
+spec:
+  selector:
+    matchLabels:
+      app: ci
+  template:
+    metadata:
+      labels:
+        app: ci
+    spec:
+      containers:
+      - name: ci-server
+        image: <image_path> 
+        command: 
+        - /root/start.sh
+        volumeMounts:
+        - name: tmp 
+          mountPath: /.kube 
+        env:
+        - name: OAUTH_TOKEN
+          value: <token>
+        - name: GITHUB_USER
+          value: <user>
+        - name: ORGANIZATION
+          value: redhat-service-assurance
+        ports:
+        - containerPort: 3000
+      initContainers:
+      - name: kube-config 
+        image: busybox
+        command: ['/bin/sh', '-c', 'cp /tmp/config /.kube/']
+        volumeMounts:
+        - name: tmp 
+          mountPath: /.kube
+        - name: kube-config
+          mountPath: /tmp/
+      volumes:
+      - name: kube-config 
+        configMap:
+          name: kube-config 
+      - name: tmp
+        emptyDir: {}
