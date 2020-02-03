@@ -6,7 +6,8 @@ ARG OC_LOC=https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest/open
 WORKDIR $D
 COPY . $D 
 
-RUN yum install nodejs -y && \
+RUN dnf install nodejs -y && \
+    dnf install git -y && \
     curl -SL $OC_LOC |\
     tar -xvz -C /usr/bin --exclude="README.md" && \
     npm install 
