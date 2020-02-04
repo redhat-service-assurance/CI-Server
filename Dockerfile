@@ -1,4 +1,4 @@
-FROM centos:centos8
+FROM centos
 ENV D=/root/
 
 ARG OC_LOC=https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest/openshift-client-linux-4.3.0.tar.gz 
@@ -20,7 +20,7 @@ RUN npm install
 RUN echo "nobody:1000000000:999999" >> /etc/subuid &&\
     echo "nobody:1000000000:999999" >> /etc/subgid
 
-EXPOSE 3000
+EXPOSE 3000 
 
 RUN chown -R nobody:nobody .
 

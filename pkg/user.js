@@ -2,8 +2,32 @@ const request = require('request');
 const child_process = require('child_process');
 const fs = require('fs');
 
+function runCommand(command) {
+    //There is a bug in the container build here, so don't use this function just yet
+    child = child_process.exec(command);
+    var data = "";
+    var error = "";
+    child.stdout.on('data', (out) => {
+        data += out;
+        console.log(out);
+    });
+    child.stderr.on('data', (out) => {
+        error += out;
+        console.log(out);
+    });
+    return new Promise( (resolve, reject) => {
+        child.on('close', (code) => {
+            resolve({
+                code: code,
+                stdout: data,
+                stderr: error
+            });
+        });
+    });
+}
+
 // Provide functions to track remote repo in a local repo
-function Repo({user, name, organization} = {}){
+function Repo({user, oauth_token, name, organization} = {}){
     var __current_branch;
     var __path; 
     var __ref;
@@ -11,23 +35,18 @@ function Repo({user, name, organization} = {}){
     this.__user = user;
     this.__name = name;
     this.__organization = organization;
+    this.__oauth_token = oauth_token;
 
-    this.__sync_branch = (callback) => {
-        return child_process.exec('sh scripts/sync-branch.sh -p ' + this.__path + ' -r ' + this.__ref + ' -b ' + this.__current_branch, (err, stdout, stderr) => {
-            callback(err, stdout, stderr);
-        })
-    }
-
-    this.runCommand = (command, callback) => {
-        return child_process.exec('cd ' + this.__path + ' && ' + command, callback)
+    this.run = (command) => {
+        return runCommand('cd ' + this.__path + ' && ' + command);
     }
 
     // sync repo to origin ref 
-    this.sync = (ref, callback) => {
+    this.sync = (ref) => {
         refObj = ref.split('/');
 
         this.__current_branch = refObj[refObj.length - 1]
-        this.__path = '/var/tmp/';
+        this.__path = '/var/tmp/' + this.__name;
         this.__ref = ref;
         
         var subpath = this.__organization;
@@ -35,19 +54,9 @@ function Repo({user, name, organization} = {}){
             subpath = this.__user;
         }
 
-        if (!fs.existsSync(this.__path + name)) {
-            console.log('Tracking new repository ' + this.__name)
-            child_process.exec('cd ' + this.__path + ' && git clone https://www.github.com/' + subpath + '/' + this.__name + '.git')
-            .on('exit', (code) => {
-                this.__path = this.__path + this.__name;
-                return this.__sync_branch(callback);
-            })
-        } else {
-            console.log('Using existing repository "' + this.__name + '"');
+        origin = 'github.com/' + subpath + '/' + this.__name + '.git';
 
-            this.__path = this.__path + this.__name;
-            return this.__sync_branch(callback);
-        }
+        return runCommand('sh scripts/sync-branch.sh -p ' + this.__path + ' -r ' + this.__ref + ' -b ' + this.__current_branch + ' -o ' + origin + ' -t ' + this.__oauth_token);
     }
 }
 
@@ -60,21 +69,38 @@ function User({oauth_token, username, organization} = {}) {
     this.__gist_url;
     this.__headers = {
         'Authorization': 'token ' + this.__oauth_token,
-        'User-Agent': username 
+        'User-Agent': username
     }
 
     // function definitions
-    this.request = ({method, endpoint = '', json = null} = {}, callback) => {
+    this.request = ({method, endpoint = '', json = null} = {}) => {
         url = this.__base_url + endpoint;
-        switch(method) {
-            case 'GET':
-                return request.get({url: url, json: json, headers: this.__headers}, callback)
-            case 'POST':
-                return request.post({url: url, json: json, headers: this.__headers}, callback)
-            default:
-                throw 'Unrecognized HTTP method';
-        }
+        return new Promise( (resolve, reject) => {
+            switch(method) {
+                case 'GET':
+                    request.get({url: url, json: json, headers: this.__headers}, (error, resp, body) => {
+                        resolve({
+                            error: error,
+                            response: resp,
+                            body: body
+                        });
+                    });
+                    break;
+                case 'POST':
+                    request.post({url: url, json: json, headers: this.__headers}, (error, resp, body) => {
+                        resolve({
+                            error: error,
+                            response: resp,
+                            body: body
+                        });
+                    });
+                    break;
+                default:
+                    reject('Unrecognized HTTP method');
+            }
+        });
     };
+        
 
     // register and track new repo
     this.registerRepo = (repoName) => {
@@ -82,20 +108,20 @@ function User({oauth_token, username, organization} = {}) {
             this.__repos.set(repoName, new Repo({
                 user: this.__user,
                 name: repoName,
-                organization: this.__organization
+                organization: this.__organization,
+                oauth_token: this.__oauth_token
             }));
+            console.log("Repository " + repoName + " registered");
         }
     }
 
-    this.syncRepo = ({repoName, ref} = {}, callback) => {
-        return this.__repos.get(repoName).sync(ref, (err, stdout, stderr) => {
-            callback(err,stdout,stderr);
-        });
+    this.syncRepo = ({repoName, ref} = {}) => {
+        return this.__repos.get(repoName).sync(ref);
     }
 
     // run command in repo
-    this.runInRepo = ({repoName, command} = {}, callback) => {
-        return this.__repos.get(repoName).runCommand(command, callback);
+    this.runInRepo = ({repoName, command} = {}) => {
+        return this.__repos.get(repoName).run(command);
     }
 
     this.updateStatus = ({repoName, ref, sha, status} = {}, callback) => {
@@ -115,14 +141,12 @@ function User({oauth_token, username, organization} = {}) {
                 return;
         }
 
-        console.log(this.__gist_url)
-
         var subpath = this.__organization;
         if(!subpath){
             subpath = this.__user;
         }
 
-        this.request({
+        return this.request({
             method: 'POST',
             endpoint: '/repos/' + subpath + '/' + repoName + '/statuses/' + sha,
             json: {
@@ -131,11 +155,11 @@ function User({oauth_token, username, organization} = {}) {
                 'target_url': this.__gist_url,
                 'context': 'CI Bot'
             }
-        }, callback);
+        });
     }
 
     this.postGist = (text, callback) => {
-       this.request({
+        this.request({
            method: 'POST',
            endpoint: '/gists',
            json: {
@@ -147,26 +171,28 @@ function User({oauth_token, username, organization} = {}) {
                     }
                 }
            }
-       }, (error, response, body) => {
-           if(!body.id){
-               callback(body);
+       }).then( (data) => {
+           if(!data.body.id){
+               callback(data.body);
            } else {
-               this.__gist_url = 'https://gist.github.com/' + this.__user + '/' + body.id
-               callback(null);
+               this.__gist_url = 'https://gist.github.com/' + this.__user + '/' + data.body.id;
+               callback(null, this.__gist_url);
            }
        });
     }
 
 
     // finish setup
-    this.request({
-        method: 'GET',
-    }, (error, response, body) => {
-        if (response.headers.status != '200 OK') {
-            console.log('Warning: authorization failed with message: ' + response.headers.status);
-        } else {
-            console.log("User successfully authorized");
-        }
-    })
+    this.getAuthStatus = () => {
+        return this.request({
+            method: 'GET',
+        }).then((data) => {
+            if (data.response.headers.status != '200 OK') {
+                console.log('Warning: authorization failed with message: ' + response.headers.status);
+            } else {
+                console.log("User successfully authorized");
+            }
+        })
+    } 
 }
 module.exports = User 
