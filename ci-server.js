@@ -3,8 +3,11 @@ const request = require('request');
 const child_process = require('child_process');
 const User = require('./pkg/user');
 const { oauth_token, github_user, organization} = require('./pkg/config');
+const JobConf = require('./pkg/config-jobs');
 
 var app = express();
+
+jobconf = new JobConf();
 
 user = new User({
     oauth_token: oauth_token,
@@ -14,20 +17,47 @@ user = new User({
 
 user.getAuthStatus();
 
-async function runTest(chunkObj) {
+async function runScript(script, repoName, ocp_project){
+    // script: list of commands
+    let output_buff = "";
+    var results;
+    for (let comm of script) {
+        results = await user.runInRepo({
+            repoName: repoName,
+            command: comm,
+            env_vars: {
+                'OCP_PROJECT': ocp_project,
+                'KUBECONFIG': '/.kube/config'
+            }
+        });
+        output_buff += results.data;
+
+        if(results.code != 0) {
+            results.data = output_buff; 
+            return results;
+        }            
+    }
+    results.data = output_buff;
+    return results;
+}
+
+async function execJob(chunkObj) {
+
+    // update local repo with remote changes
     user.registerRepo(chunkObj.repository.name);
 
     await user.syncRepo({
         repoName: chunkObj.repository.name,
         ref: chunkObj.ref
-    })    
+    })
 
-    //run tests
-    console.log("\n\nTest Output");
-    results = await user.runInRepo({
-        repoName: chunkObj.repository.name,
-        command: 'sh ci.sh'
-    });
+    // read in job config
+    jobconf.read('/var/tmp/' + chunkObj.repository.name + '/ci.yml');
+
+    //run scripts
+    console.log("\n\nRunning Scripts");
+    results = await runScript(jobconf.script, chunkObj.repository.name, chunkObj.after);
+
     let end_status = "";
     if(results.code != 0) {
         end_status = "failure";
@@ -35,27 +65,34 @@ async function runTest(chunkObj) {
         end_status = "success";
     }             
 
-    console.log('Test for ' + chunkObj.repository.name + ':' + chunkObj.after + ' ended with status ' + end_status)
-    user.postGist("Test results\n\n" + results.stdout + results.stderr, (error, url) => { //Gotta get output to post to gist!
+    console.log('Script for ' + chunkObj.repository.name + ':' + chunkObj.after + ' ended with status ' + end_status)
+
+   // run after_script 
+
+    console.log("\n\nRunning After_Script");
+    asResults = await runScript(jobconf.after_script, chunkObj.repository.name, chunkObj.after);
+
+    user.postGist("******Script results******\n" + results.data + "\n\n******After Scripts******\n" + asResults.data, (error, url) => {
         if(error) {
             console.log('Could not post test output to gist: ');
             console.log(error);
         } else {
             console.log("Gist available at: " + url);
         }
-    });
 
-    user.updateStatus({
-        repoName: chunkObj.repository.name,
-        ref: chunkObj.ref,
-        sha: chunkObj.after,
-        status: end_status 
-    }).then( (data) => {
-        if(data.body.message) {
-            console.log("[CI Server] Failed to update statuses: " + body.message);
-        } else {
-            console.log("[CI Server] Posted status '" + end_status + "' to repo " + chunkObj.repository.name);
-        }
+        // post final script statuses
+        user.updateStatus({
+            repoName: chunkObj.repository.name,
+            ref: chunkObj.ref,
+            sha: chunkObj.after,
+            status: end_status 
+        }).then( (data) => {
+            if(data.body.message) {
+                console.log("[CI Server] Failed to update statuses: " + body.message);
+            } else {
+                console.log("[CI Server] Posted status '" + end_status + "' to repo " + chunkObj.repository.name);
+            }
+        });
     });
 }
 
@@ -74,7 +111,7 @@ app.post('/commit', (req, res) => {
                 console.log("[CI Server] Posted status 'pending' to repo " + chunkObj.repository.name);
             }
         });
-        runTest(chunkObj);
+        execJob(chunkObj);
     });
 });
 
