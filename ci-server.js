@@ -17,7 +17,7 @@ user = new User({
 
 user.getAuthStatus();
 
-async function runScript(script, repoName, ocp_project){
+async function runScript({script, repoName, ref, ocp_project} = {}){
     // script: list of commands
     let output_buff = "";
     var results;
@@ -25,6 +25,7 @@ async function runScript(script, repoName, ocp_project){
         results = await user.runInRepo({
             repoName: repoName,
             command: comm,
+            ref: ref,
             env_vars: {
                 'OCP_PROJECT': ocp_project,
                 'KUBECONFIG': '/.kube/config'
@@ -56,7 +57,12 @@ async function execJob(chunkObj) {
 
     //run scripts
     console.log("\n\nRunning Scripts");
-    results = await runScript(jobconf.script, chunkObj.repository.name, chunkObj.after);
+    results = await runScript({
+        script: jobconf.script, 
+        repoName: chunkObj.repository.name,
+        ref: chunkObj.ref, 
+        ocp_project: chunkObj.after
+    });
 
     let end_status = "";
     if(results.code != 0) {
@@ -70,7 +76,13 @@ async function execJob(chunkObj) {
    // run after_script 
 
     console.log("\n\nRunning After_Script");
-    asResults = await runScript(jobconf.after_script, chunkObj.repository.name, chunkObj.after);
+
+    asResults = await runScript({
+        script: jobconf.after_script, 
+        repoName: chunkObj.repository.name,
+        ref: chunkObj.ref, 
+        ocp_project: chunkObj.after
+    });
 
     user.postGist("******Script results******\n" + results.data + "\n\n******After Scripts******\n" + asResults.data, (error, url) => {
         if(error) {

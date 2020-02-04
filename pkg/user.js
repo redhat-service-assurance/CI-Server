@@ -2,7 +2,7 @@ const request = require('request');
 const child_process = require('child_process');
 const fs = require('fs');
 
-function runCommand(command, env_vars ) {
+function runCommand(command, env_vars) {
     //There is a bug in the container build here, so don't use this function just yet
     child = child_process.exec(command, {env: env_vars});
     var data = "";
@@ -19,14 +19,53 @@ function runCommand(command, env_vars ) {
         child.on('close', (code) => {
             resolve({
                 code: code,
-                data: data,
+                data: data
             });
         });
     });
 }
 
+function Job(){
+    var __process;
+    var __is_running;
+
+    this.run = (command, env_vars) => {
+        __process = child_process.exec(command, {env: env_vars});
+        __is_running = true;
+        var data = "";
+        var error = "";
+        __process.stdout.on('data', (out) => {
+            data += out;
+            console.log(out);
+        });
+        __process.stderr.on('data', (out) => {
+            data += out;
+            console.log(out);
+        });
+
+        return new Promise( (resolve, reject) => {
+            __process.on('close', (code) => {
+                __is_running = false;
+                resolve({
+                    code: code,
+                    data: data
+                });
+            });
+        });
+    }
+
+    this.kill = () => {
+        if(__is_running) {
+            __is_running = false;
+            return __process.kill('SIGHUP');
+        }
+        return true;
+    }
+}
+
 // Provide functions to track remote repo in a local repo
 function Repo({user, oauth_token, name, organization} = {}){
+    //TODO: give each ref it's own file system
     var __current_branch;
     var __path; 
     var __ref;
@@ -35,9 +74,20 @@ function Repo({user, oauth_token, name, organization} = {}){
     this.__name = name;
     this.__organization = organization;
     this.__oauth_token = oauth_token;
+    this.__jobs = new Map();
 
-    this.run = (command, env_vars) => {
-        return runCommand('cd ' + this.__path + ' && ' + command, env_vars);
+    this.runJob = (command, env_vars, ref) => {
+        if(!this.__jobs.has(ref)) {
+            this.__jobs.set(ref, new Job());
+            return this.__jobs.get(ref).run('cd ' + this.__path + ' && ' + command, env_vars);
+        } else {
+            console.log("Stopping previous job for " + this.__name + ':' + ref);
+            if (this.__jobs.get(ref).kill()) {
+                return this.__jobs.get(ref).run('cd ' + this.__path + ' && ' + command, env_vars);
+            } else {
+                console.log("Error stopping job for " + this.__name + ':' + ref);
+            }
+        }
     }
 
     // sync repo to origin ref 
@@ -119,8 +169,8 @@ function User({oauth_token, username, organization} = {}) {
     }
 
     // run command in repo
-    this.runInRepo = ({repoName, command, env_vars} = {}) => {
-        return this.__repos.get(repoName).run(command, env_vars);
+    this.runInRepo = ({repoName, command, env_vars, ref} = {}) => {
+        return this.__repos.get(repoName).runJob(command, env_vars, ref);
     }
 
     this.updateStatus = ({repoName, ref, sha, status} = {}, callback) => {
