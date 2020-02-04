@@ -2,9 +2,9 @@ const request = require('request');
 const child_process = require('child_process');
 const fs = require('fs');
 
-function runCommand(command) {
+function runCommand(command, env_vars ) {
     //There is a bug in the container build here, so don't use this function just yet
-    child = child_process.exec(command);
+    child = child_process.exec(command, {env: env_vars});
     var data = "";
     var error = "";
     child.stdout.on('data', (out) => {
@@ -12,15 +12,14 @@ function runCommand(command) {
         console.log(out);
     });
     child.stderr.on('data', (out) => {
-        error += out;
+        data += out;
         console.log(out);
     });
     return new Promise( (resolve, reject) => {
         child.on('close', (code) => {
             resolve({
                 code: code,
-                stdout: data,
-                stderr: error
+                data: data,
             });
         });
     });
@@ -37,8 +36,8 @@ function Repo({user, oauth_token, name, organization} = {}){
     this.__organization = organization;
     this.__oauth_token = oauth_token;
 
-    this.run = (command) => {
-        return runCommand('cd ' + this.__path + ' && ' + command);
+    this.run = (command, env_vars) => {
+        return runCommand('cd ' + this.__path + ' && ' + command, env_vars);
     }
 
     // sync repo to origin ref 
@@ -120,21 +119,21 @@ function User({oauth_token, username, organization} = {}) {
     }
 
     // run command in repo
-    this.runInRepo = ({repoName, command} = {}) => {
-        return this.__repos.get(repoName).run(command);
+    this.runInRepo = ({repoName, command, env_vars} = {}) => {
+        return this.__repos.get(repoName).run(command, env_vars);
     }
 
     this.updateStatus = ({repoName, ref, sha, status} = {}, callback) => {
         var desc;
         switch(status){
             case 'success':
-                desc = 'All checks passed';
+                desc = 'All jobs passed';
                 break;
             case 'failure':
-                desc = 'Some checks failed';
+                desc = 'Some jobs failed';
                 break;
             case 'pending':
-                desc = 'Pending';
+                desc = 'Running jobs';
                 break;
             default:
                 callback('Unrecognized status');
