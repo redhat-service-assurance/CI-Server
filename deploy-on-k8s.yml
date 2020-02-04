@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
       - name: ci-server
-        image: <image_path> 
+        image: <<image_path>>
         command: 
         - /root/start.sh
         volumeMounts:
@@ -41,7 +41,7 @@ spec:
           mountPath: /tmp/
       volumes:
       - name: kube-config 
-        configMap:
-          name: kube-config 
+        secret:
+          secretName: kube-config
       - name: tmp
         emptyDir: {}
