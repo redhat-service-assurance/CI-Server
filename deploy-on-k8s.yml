@@ -1,9 +1,9 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: ci-server 
+  name: ci-server
   labels:
-    app: ci 
+    app: ci
 spec:
   selector:
     matchLabels:
@@ -13,14 +13,18 @@ spec:
       labels:
         app: ci
     spec:
+      securityContext:
+        runAsUser: 65534
+        runAsGroup: 65534
+      serviceAccountName: builder
       containers:
       - name: ci-server
         image: <<image_path>>
-        command: 
+        command:
         - /root/start.sh
         volumeMounts:
-        - name: tmp 
-          mountPath: /.kube 
+        - name: tmp
+          mountPath: /.kube
         env:
         - name: OAUTH_TOKEN
           value: <token>
@@ -31,16 +35,16 @@ spec:
         ports:
         - containerPort: 3000
       initContainers:
-      - name: kube-config 
+      - name: kube-config
         image: busybox
         command: ['/bin/sh', '-c', 'cp /tmp/config /.kube/']
         volumeMounts:
-        - name: tmp 
+        - name: tmp
           mountPath: /.kube
         - name: kube-config
           mountPath: /tmp/
       volumes:
-      - name: kube-config 
+      - name: kube-config
         secret:
           secretName: kube-config
       - name: tmp

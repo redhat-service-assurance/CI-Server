@@ -24,6 +24,9 @@ ${IMAGE_BUILDER} push ${REG_EXTRAFLAGS} "${OCP_REGISTRY}/${OCP_PROJECT}/${NAME}"
 oc delete secret kube-config || true
 oc create secret generic kube-config --from-file="${KUBECONFIG}"
 
+# Allow the CI pod to run under any UID via the builder serviceAccount
+oc adm policy add-scc-to-user anyuid -z builder
+
 oc delete deployment ci-server || true
 oc create -f <(sed "\
     s|<<image_path>>|${OCP_REGISTRY_INTERNAL}/${OCP_PROJECT}/${NAME}:${OCP_TAG}|g;" \
