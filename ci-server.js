@@ -43,17 +43,40 @@ async function runScript({script, repoName, ref, ocp_project} = {}){
 }
 
 async function execJob(chunkObj) {
+    refObj = chunkObj.ref.split('/');
+    let branch = refObj[refObj.length - 1]
 
     // update local repo with remote changes
     user.registerRepo(chunkObj.repository.name);
 
     await user.syncRepo({
         repoName: chunkObj.repository.name,
-        ref: chunkObj.ref
-    })
+        ref: chunkObj.ref,
+        tree_sha: chunkObj.head_commit.tree_id
+    });
 
     // read in job config
-    jobconf.read('/var/tmp/' + chunkObj.repository.name + '/ci.yml');
+    jobconf.clear();
+    try{
+        jobconf.read('/var/tmp/' + chunkObj.repository.name + '/' + branch + '/ci.yml');
+    } catch(err) {
+        console.log(err);
+        return
+    }
+
+    // post pending status
+    user.updateStatus({
+        repoName: chunkObj.repository.name,
+        ref: chunkObj.ref,
+        sha: chunkObj.after,
+        status: 'pending'
+    }).then( (data) => {
+        if(data.body.message) {
+            console.log("[CI Server] Failed to update 'pending' statuses to " + chunkObj.repository.name + " with: " + body.message);
+        } else {
+            console.log("[CI Server] Posted status 'pending' to repo " + chunkObj.repository.name);
+        }
+    });
 
     //run scripts
     console.log("\n\nRunning Scripts");
@@ -111,18 +134,6 @@ async function execJob(chunkObj) {
 app.post('/commit', (req, res) => {
     req.on('data', (chunk) => {
         chunkObj = JSON.parse(chunk);
-        user.updateStatus({
-            repoName: chunkObj.repository.name,
-            ref: chunkObj.ref,
-            sha: chunkObj.after,
-            status: 'pending'
-        }).then( (data) => {
-            if(data.body.message) {
-                console.log("[CI Server] Failed to update 'pending' statuses to " + chunkObj.repository.name + " with: " + body.message);
-            } else {
-                console.log("[CI Server] Posted status 'pending' to repo " + chunkObj.repository.name);
-            }
-        });
         execJob(chunkObj);
     });
 });
