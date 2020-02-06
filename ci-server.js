@@ -21,15 +21,13 @@ async function runScript({script, repoName, ref, ocp_project} = {}){
     // script: list of commands
     let output_buff = "";
     var results;
+    process.env.OCP_PROJECT = ocp_project;
     for (let comm of script) {
         results = await user.runInRepo({
             repoName: repoName,
             command: comm,
             ref: ref,
-            env_vars: {
-                'OCP_PROJECT': ocp_project,
-                'KUBECONFIG': '/.kube/config'
-            }
+            env_vars: process.env
         });
         output_buff += results.data;
 

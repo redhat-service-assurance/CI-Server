@@ -3,8 +3,8 @@ const child_process = require('child_process');
 const fs = require('fs');
 
 function runCommand(command, env_vars) {
-    //There is a bug in the container build here, so don't use this function just yet
-    child = child_process.exec(command, {env: env_vars});
+    child = child_process.exec(command, {env: env_vars, shell: '/bin/bash'});
+    console.log(env_vars);
     var data = "";
     var error = "";
     child.stdout.on('data', (out) => {
@@ -30,7 +30,7 @@ function Job(){
     var __is_running;
 
     this.run = (command, env_vars) => {
-        __process = child_process.exec(command, {env: env_vars});
+        __process = child_process.exec(command, {env: env_vars, shell: '/bin/bash'});
         __is_running = true;
         var data = "";
         var error = "";
