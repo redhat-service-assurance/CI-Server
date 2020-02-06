@@ -6,11 +6,16 @@ function JobConfig(){
         try {
             doc = yaml.safeLoad(fs.readFileSync(filepath, 'utf-8'));
         } catch(err) {
-            console.log("Error reading in test config file: " + err);
+            throw "Error reading in test config file: " + err;
         }
 
         this.script = doc.script;
         this.after_script = doc.after_script;
+    }
+
+    this.clear = () => {
+        this.script = "",
+        this.after_script = ""
     }
 }
 

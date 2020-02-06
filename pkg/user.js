@@ -77,35 +77,92 @@ function Repo({user, oauth_token, name, organization} = {}){
     this.__jobs = new Map();
 
     this.runJob = (command, env_vars, ref) => {
+        refObj = ref.split('/');
+        let branch = refObj[refObj.length - 1]
+        let branch_path = this.__path + '/' + branch;
         if(!this.__jobs.has(ref)) {
             this.__jobs.set(ref, new Job());
-            return this.__jobs.get(ref).run('cd ' + this.__path + ' && ' + command, env_vars);
+            return this.__jobs.get(ref).run('cd ' + branch_path + ' && ' + command, env_vars);
         } else {
-            console.log("Stopping previous job for " + this.__name + ':' + ref);
+            console.log("Stopping previous job for " + branch_path + ':' + ref);
             if (this.__jobs.get(ref).kill()) {
-                return this.__jobs.get(ref).run('cd ' + this.__path + ' && ' + command, env_vars);
+                return this.__jobs.get(ref).run('cd ' + branch_path + ' && ' + command, env_vars);
             } else {
-                console.log("Error stopping job for " + this.__name + ':' + ref);
+                console.log("Error stopping job for " + branch_path + ':' + ref);
             }
         }
     }
 
-    // sync repo to origin ref 
-    this.sync = (ref) => {
-        refObj = ref.split('/');
+    this.__getFile = (url) => {
+        return new Promise( (resolve, reject) => {
+            request.get({url: url, headers: {
+                'User-Agent': this.__user,
+                'Authorization': 'token ' + this.__oauth_token
+            }}, (error, resp, body) => {
+                resolve({
+                    error: error,
+                    response: resp,
+                    body: body
+                });
+            });
+        });
+    }
 
-        this.__current_branch = refObj[refObj.length - 1]
-        this.__path = '/var/tmp/' + this.__name;
-        this.__ref = ref;
-        
-        var subpath = this.__organization;
-        if(!subpath){
-            subpath = this.__user;
+    this.__recursiveBuild = async (tree_obj, path) => {
+        if(tree_obj) {
+            for (let branch_obj of tree_obj.tree) {
+                if (branch_obj.type == 'tree') {
+                    if ( ! fs.existsSync(path + branch_obj.path)) {
+                        fs.mkdirSync(path + branch_obj.path);
+                        console.log("Created directory: " + path + branch_obj.path);
+                    }
+
+                    let resp = await this.__getFile(branch_obj.url);
+                    child_tree = JSON.parse(resp.body);
+
+                    await this.__recursiveBuild(child_tree , path + branch_obj.path + '/' );
+
+                } else if (branch_obj.type == 'blob') {
+                    let resp = await this.__getFile(branch_obj.url);
+                    let blob = JSON.parse(resp.body).content
+                    let buff = new Buffer(blob, 'base64');
+                    let text = buff.toString('ascii');
+
+                    fs.writeFileSync(path + branch_obj.path, text, { flag: 'w' });
+
+                    comp = branch_obj.path.split('.');
+                    console.log("Wrote to file: " + path + branch_obj.path);
+
+                    if( comp[comp.length - 1] == 'sh') { // give execute permissions to .sh files
+                        runCommand('cd ' + path + ' && chmod +x ' + branch_obj.path);
+                    }
+                }
+            }
         }
+    }
 
-        origin = 'github.com/' + subpath + '/' + this.__name + '.git';
+    this.sync = async (tree_url, ref, oauth_token) => {
+        refObj = ref.split('/');
+        let branch = refObj[refObj.length - 1]
+        this.__path = '/var/tmp/' + this.__name;
+        this.__oauth_token = oauth_token;
 
-        return runCommand('sh scripts/sync-branch.sh -p ' + this.__path + ' -r ' + this.__ref + ' -b ' + this.__current_branch + ' -o ' + origin + ' -t ' + this.__oauth_token);
+        branch_path = this.__path + '/' + branch + '/';
+        if ( ! fs.existsSync(this.__path)) {
+            fs.mkdirSync(this.__path);
+        }
+        if ( ! fs.existsSync(branch_path)) {
+            fs.mkdirSync(branch_path);
+        }
+        let resp = await this.__getFile(tree_url);
+        if(resp.error){
+            console.log("Error getting tree object from github: " + resp.error)
+        }
+        try{
+            await this.__recursiveBuild(JSON.parse(resp.body), branch_path);
+        } catch(err) {
+            console.log("When calling " + tree_url + ': ' + err);
+        }
     }
 }
 
@@ -148,8 +205,7 @@ function User({oauth_token, username, organization} = {}) {
                     reject('Unrecognized HTTP method');
             }
         });
-    };
-        
+    };        
 
     // register and track new repo
     this.registerRepo = (repoName) => {
@@ -164,8 +220,13 @@ function User({oauth_token, username, organization} = {}) {
         }
     }
 
-    this.syncRepo = ({repoName, ref} = {}) => {
-        return this.__repos.get(repoName).sync(ref);
+    this.syncRepo = ({repoName, ref, tree_sha} = {}) => {
+        var subpath = this.__organization;
+        if(!subpath){
+            subpath = this.__user;
+        }
+        let url = this.__base_url + '/repos/' + subpath + '/' + repoName + '/git/trees/' + tree_sha;
+        return this.__repos.get(repoName).sync(url, ref, this.__oauth_token);
     }
 
     // run command in repo
