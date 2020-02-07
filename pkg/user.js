@@ -83,7 +83,7 @@ function Repo({user, oauth_token, name, organization} = {}){
             this.__jobs.set(ref, new Job());
             return this.__jobs.get(ref).run('cd ' + branch_path + ' && ' + command, env_vars);
         } else {
-            console.log("Stopping previous job for " + branch_path + ':' + ref);
+            console.log("Stopping previous job for " + ref);
             if (this.__jobs.get(ref).kill()) {
                 return this.__jobs.get(ref).run('cd ' + branch_path + ' && ' + command, env_vars);
             } else {
@@ -233,7 +233,7 @@ function User({oauth_token, username, organization} = {}) {
         return this.__repos.get(repoName).runJob(command, env_vars, ref);
     }
 
-    this.updateStatus = ({repoName, ref, sha, status} = {}, callback) => {
+    this.updateStatus = ({repoName, ref, sha, status, url} = {}, callback) => {
         var desc;
         switch(status){
             case 'success':
@@ -261,7 +261,7 @@ function User({oauth_token, username, organization} = {}) {
             json: {
                 'state': status,
                 'description': desc,
-                'target_url': this.__gist_url,
+                'target_url': url,
                 'context': 'CI Bot'
             }
         });

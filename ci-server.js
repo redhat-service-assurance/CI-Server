@@ -21,23 +21,22 @@ async function runScript({script, repoName, ref, ocp_project} = {}){
     // script: list of commands
     let output_buff = "";
     var results;
-    process.env.OCP_PROJECT = ocp_project;
-    for (let comm of script) {
-        results = await user.runInRepo({
-            repoName: repoName,
-            command: comm,
-            ref: ref,
-            env_vars: process.env
-        });
-        output_buff += results.data;
+    env_clone = process.env;
+    var env_clone = Object.create( process.env );
+    env_clone.OCP_PROJECT = ocp_project;
 
-        if(results.code != 0) {
-            results.data = output_buff; 
-            return results;
-        }            
+    let complete_comm = "";
+    for (let comm of script) {
+        complete_comm += comm + ';'
     }
-    results.data = output_buff;
-    return results;
+    console.log(complete_comm);
+
+    return await user.runInRepo({ 
+        repoName: repoName,
+        command: complete_comm,
+        ref: ref,
+        env_vars: env_clone 
+    });
 }
 
 async function execJob(chunkObj) {
@@ -118,7 +117,8 @@ async function execJob(chunkObj) {
             repoName: chunkObj.repository.name,
             ref: chunkObj.ref,
             sha: chunkObj.after,
-            status: end_status 
+            status: end_status,
+            url: url
         }).then( (data) => {
             if(data.body.message) {
                 console.log("[CI Server] Failed to update statuses: " + body.message);
