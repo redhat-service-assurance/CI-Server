@@ -4,7 +4,6 @@ const fs = require('fs');
 
 function runCommand(command, env_vars) {
     child = child_process.exec(command, {env: env_vars, shell: '/bin/bash'});
-    console.log(env_vars);
     var data = "";
     var error = "";
     child.stdout.on('data', (out) => {
