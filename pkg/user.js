@@ -56,7 +56,7 @@ function Job(){
     this.kill = () => {
         if(__is_running) {
             __is_running = false;
-            return __process.kill('SIGHUP');
+            return __process.kill('SIGTERM');
         }
         return true;
     }
