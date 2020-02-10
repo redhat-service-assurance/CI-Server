@@ -29,10 +29,9 @@ function Job(){
     var __is_running;
 
     this.run = (command, env_vars) => {
-        __process = child_process.exec(command, {env: env_vars, shell: '/bin/bash'});
+        __process = child_process.exec(command, {detached: true, env: env_vars, shell: '/bin/bash'});
         __is_running = true;
         var data = "";
-        var error = "";
         __process.stdout.on('data', (out) => {
             data += out;
             console.log(out);
@@ -53,14 +52,26 @@ function Job(){
         });
     }
 
-    this.kill = async () => {
+    this.kill = () => {
         if(__is_running) {
-            __is_running = false;
-            let res = __process.kill('SIGTERM');
-            await __process;
-            return res;
+            console.log(__process.pid);
+            __process.stdin.end();
+            __process.stdout.destroy();
+            __process.stderr.destroy();
+            if(__process.kill()) {
+                console.log("Killing job");
+            }
+            return new Promise( (resolve, reject) => {
+                __process.on('close', (code, signal) => {
+                    console.log("Job killed with code " + code + " from signal " + signal );
+                    __is_running = false;
+                    resolve({
+                        code: code,
+                        data: 'Job killed'
+                    });
+                });
+            });
         }
-        return true;
     }
 }
 
@@ -80,22 +91,22 @@ function Repo({user, oauth_token, name, organization} = {}){
     this.__kill_sync = false;
     this.__sync_proc = null; 
 
+    this.killJob = (ref) => {
+        if(this.__jobs.has(ref)) {
+            return this.__jobs.get(ref).kill();
+        }
+    }
+
     this.runJob = (command, env_vars, ref) => {
         refObj = ref.split('/');
         let branch = refObj[refObj.length - 1]
         let branch_path = this.__path + '/' + branch;
+
         if(!this.__jobs.has(ref)) {
             this.__jobs.set(ref, new Job());
             return this.__jobs.get(ref).run('cd ' + branch_path + ' && ' + command, env_vars);
         } else {
-            this.__jobs.get(ref).kill().then((res) => {
-                if (res) {
-                    console.log("Old job discarded");
-                    return this.__jobs.get(ref).run('cd ' + branch_path + ' && ' + command, env_vars);
-                } else {
-                    console.log("Error stopping job for " + branch_path + ':' + ref);
-                }
-            })
+            return this.__jobs.get(ref).run('cd ' + branch_path + ' && ' + command, env_vars);
         }
     }
 
@@ -237,6 +248,12 @@ function User({oauth_token, username, organization} = {}) {
             }
         });
     };        
+
+    this.killRepoJob = (repoName, ref) => {
+        if(this.__repos.has(repoName)) {
+            return this.__repos.get(repoName).killJob(ref);
+        }
+    }
 
     // register and track new repo
     this.registerRepo = (repoName) => {

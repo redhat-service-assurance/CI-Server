@@ -29,7 +29,6 @@ async function runScript({script, repoName, ref, ocp_project} = {}){
     for (let comm of script) {
         complete_comm += comm + ';'
     }
-    console.log(complete_comm);
 
     return await user.runInRepo({ 
         repoName: repoName,
@@ -40,19 +39,29 @@ async function runScript({script, repoName, ref, ocp_project} = {}){
 }
 
 async function execJob(chunkObj) {
+    // parse incoming object
     refObj = chunkObj.ref.split('/');
     let branch = refObj[refObj.length - 1]
+
 
     // update local repo with remote changes
     user.registerRepo(chunkObj.repository.name);
 
-    let isKilled = await user.syncRepo({
+    // kill any previous jobs running in this repo
+    await user.killRepoJob(chunkObj.repository.name, chunkObj.ref);
+    // if(jobKilled) {
+    //     console.log("Job running for " + chunkObj.repository.name + ":" + branch + " killed");
+    // }
+
+    
+    // sync new changes to local repo
+    let syncKilled = await user.syncRepo({
         repoName: chunkObj.repository.name,
         ref: chunkObj.ref,
         tree_sha: chunkObj.head_commit.tree_id
     });
 
-    if(isKilled) {
+    if(syncKilled) {
         console.log("Sync killed for " + chunkObj.after);
         return
     }
