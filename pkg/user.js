@@ -53,10 +53,12 @@ function Job(){
         });
     }
 
-    this.kill = () => {
+    this.kill = async () => {
         if(__is_running) {
             __is_running = false;
-            return __process.kill('SIGTERM');
+            let res = __process.kill('SIGTERM');
+            await __process;
+            return res;
         }
         return true;
     }
@@ -86,12 +88,14 @@ function Repo({user, oauth_token, name, organization} = {}){
             this.__jobs.set(ref, new Job());
             return this.__jobs.get(ref).run('cd ' + branch_path + ' && ' + command, env_vars);
         } else {
-            console.log("Stopping previous job for " + ref);
-            if (this.__jobs.get(ref).kill()) {
-                return this.__jobs.get(ref).run('cd ' + branch_path + ' && ' + command, env_vars);
-            } else {
-                console.log("Error stopping job for " + branch_path + ':' + ref);
-            }
+            this.__jobs.get(ref).kill().then((res) => {
+                if (res) {
+                    console.log("Old job discarded");
+                    return this.__jobs.get(ref).run('cd ' + branch_path + ' && ' + command, env_vars);
+                } else {
+                    console.log("Error stopping job for " + branch_path + ':' + ref);
+                }
+            })
         }
     }
 
