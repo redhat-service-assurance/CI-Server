@@ -46,11 +46,16 @@ async function execJob(chunkObj) {
     // update local repo with remote changes
     user.registerRepo(chunkObj.repository.name);
 
-    await user.syncRepo({
+    let isKilled = await user.syncRepo({
         repoName: chunkObj.repository.name,
         ref: chunkObj.ref,
         tree_sha: chunkObj.head_commit.tree_id
     });
+
+    if(isKilled) {
+        console.log("Sync killed for " + chunkObj.after);
+        return
+    }
 
     // read in job config
     jobconf.clear();

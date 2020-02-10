@@ -74,6 +74,9 @@ function Repo({user, oauth_token, name, organization} = {}){
     this.__organization = organization;
     this.__oauth_token = oauth_token;
     this.__jobs = new Map();
+    this.__synchronizing = false;
+    this.__kill_sync = false;
+    this.__sync_proc = null; 
 
     this.runJob = (command, env_vars, ref) => {
         refObj = ref.split('/');
@@ -110,7 +113,7 @@ function Repo({user, oauth_token, name, organization} = {}){
     this.__recursiveBuild = async (tree_obj, path) => {
         if(tree_obj) {
             for (let branch_obj of tree_obj.tree) {
-                if (branch_obj.type == 'tree') {
+                if (branch_obj.type == 'tree' && ! this.__kill_sync) {
                     if ( ! fs.existsSync(path + branch_obj.path)) {
                         fs.mkdirSync(path + branch_obj.path);
                         console.log("Created directory: " + path + branch_obj.path);
@@ -121,7 +124,7 @@ function Repo({user, oauth_token, name, organization} = {}){
 
                     await this.__recursiveBuild(child_tree , path + branch_obj.path + '/' );
 
-                } else if (branch_obj.type == 'blob') {
+                } else if (branch_obj.type == 'blob' && ! this.__kill_sync) {
                     let resp = await this.__getFile(branch_obj.url);
                     let blob = JSON.parse(resp.body).content
                     let buff = new Buffer(blob, 'base64');
@@ -134,13 +137,30 @@ function Repo({user, oauth_token, name, organization} = {}){
 
                     if( comp[comp.length - 1] == 'sh') { // give execute permissions to .sh files
                         runCommand('cd ' + path + ' && chmod +x ' + branch_obj.path);
-                    }
+                    } 
                 }
+            }
+            if (this.__kill_sync) {
+                return 'killed';
+            } else {
+                return 'complete';
             }
         }
     }
 
+    // stop sync if new sync comes in
+    // When new sync comes in, set killsync signal to true, wait for it to become false, then continue
     this.sync = async (tree_url, ref, oauth_token) => {
+        console.log('Syncing ' + ref);
+        let killed = false;
+        if(this.__synchronizing) {
+            console.log("Killing previous sync");
+            this.__kill_sync = true;
+            await this.__sync_proc;
+            this.__kill_sync = false;
+        }
+
+        this.__synchronizing = true;
         refObj = ref.split('/');
         let branch = refObj[refObj.length - 1]
         this.__path = '/var/tmp/' + this.__name;
@@ -158,10 +178,18 @@ function Repo({user, oauth_token, name, organization} = {}){
             console.log("Error getting tree object from github: " + resp.error)
         }
         try{
-            await this.__recursiveBuild(JSON.parse(resp.body), branch_path);
+            this.__sync_proc = this.__recursiveBuild(JSON.parse(resp.body), branch_path);
+            let res = await this.__sync_proc;
+            this.__synchronizing = false;
+            console.log(res);
+            if( res == 'killed') {
+                killed = true;
+            } 
         } catch(err) {
             console.log("When calling " + tree_url + ': ' + err);
         }
+
+        return killed;
     }
 }
 
@@ -296,6 +324,9 @@ function User({oauth_token, username, organization} = {}) {
         return this.request({
             method: 'GET',
         }).then((data) => {
+            if (data.response.headers.status == '403 Forbidden') {
+                throw "Error authenticating with github: " + data.body;
+            }
             if (data.response.headers.status != '200 OK') {
                 console.log('Warning: authorization failed with message: ' + response.headers.status);
             } else {
