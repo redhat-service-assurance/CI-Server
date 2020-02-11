@@ -34,7 +34,7 @@ async function runScript({script, repoName, ref, ocp_project} = {}){
         command: complete_comm,
         ref: ref,
         env_vars: env_clone,
-        timeout: 600 
+        timeout: 1200 
     });
 }
 
