@@ -19,8 +19,6 @@ user.getAuthStatus();
 
 async function runScript({script, repoName, ref, ocp_project} = {}){
     // script: list of commands
-    let output_buff = "";
-    var results;
     env_clone = process.env;
     var env_clone = Object.create( process.env );
     env_clone.OCP_PROJECT = ocp_project;
