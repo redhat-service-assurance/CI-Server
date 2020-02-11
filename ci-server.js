@@ -24,6 +24,7 @@ async function runScript({script, repoName, ref, ocp_project} = {}){
     env_clone = process.env;
     var env_clone = Object.create( process.env );
     env_clone.OCP_PROJECT = ocp_project;
+    env_clone.HOME = '/var/tmp/' + repoName + '/' + ref;
 
     let complete_comm = "";
     for (let comm of script) {
@@ -39,25 +40,19 @@ async function runScript({script, repoName, ref, ocp_project} = {}){
 }
 
 async function execJob(chunkObj) {
-    // parse incoming object
-    refObj = chunkObj.ref.split('/');
-    let branch = refObj[refObj.length - 1]
 
+    let refSanitized = chunkObj.ref.replace(/\//g, '-');
 
     // update local repo with remote changes
     user.registerRepo(chunkObj.repository.name);
 
     // kill any previous jobs running in this repo
-    await user.killRepoJob(chunkObj.repository.name, chunkObj.ref);
-    // if(jobKilled) {
-    //     console.log("Job running for " + chunkObj.repository.name + ":" + branch + " killed");
-    // }
-
+    await user.killRepoJob(chunkObj.repository.name, refSanitized);
     
     // sync new changes to local repo
     let syncKilled = await user.syncRepo({
         repoName: chunkObj.repository.name,
-        ref: chunkObj.ref,
+        ref: refSanitized,
         tree_sha: chunkObj.head_commit.tree_id
     });
 
@@ -69,7 +64,7 @@ async function execJob(chunkObj) {
     // read in job config
     jobconf.clear();
     try{
-        jobconf.read('/var/tmp/' + chunkObj.repository.name + '/' + branch + '/ci.yml');
+        jobconf.read('/var/tmp/' + chunkObj.repository.name + '/' + refSanitized + '/ci.yml');
     } catch(err) {
         console.log(err);
         return
@@ -78,7 +73,7 @@ async function execJob(chunkObj) {
     // post pending status
     user.updateStatus({
         repoName: chunkObj.repository.name,
-        ref: chunkObj.ref,
+        ref: refSanitized,
         sha: chunkObj.after,
         status: 'pending'
     }).then( (data) => {
@@ -94,7 +89,7 @@ async function execJob(chunkObj) {
     results = await runScript({
         script: jobconf.script, 
         repoName: chunkObj.repository.name,
-        ref: chunkObj.ref, 
+        ref: refSanitized, 
         ocp_project: chunkObj.after
     });
 
@@ -114,7 +109,7 @@ async function execJob(chunkObj) {
     asResults = await runScript({
         script: jobconf.after_script, 
         repoName: chunkObj.repository.name,
-        ref: chunkObj.ref, 
+        ref: refSanitized,
         ocp_project: chunkObj.after
     });
 
@@ -129,7 +124,7 @@ async function execJob(chunkObj) {
         // post final script statuses
         user.updateStatus({
             repoName: chunkObj.repository.name,
-            ref: chunkObj.ref,
+            ref: refSanitized,
             sha: chunkObj.after,
             status: end_status,
             url: url

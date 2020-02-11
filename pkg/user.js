@@ -78,7 +78,6 @@ function Job(){
 // Provide functions to track remote repo in a local repo
 function Repo({user, oauth_token, name, organization} = {}){
     //TODO: give each ref it's own file system
-    var __current_branch;
     var __path; 
     var __ref;
 
@@ -98,15 +97,13 @@ function Repo({user, oauth_token, name, organization} = {}){
     }
 
     this.runJob = (command, env_vars, ref) => {
-        refObj = ref.split('/');
-        let branch = refObj[refObj.length - 1]
-        let branch_path = this.__path + '/' + branch;
+        let ref_path = this.__path + '/' + ref;
 
         if(!this.__jobs.has(ref)) {
             this.__jobs.set(ref, new Job());
-            return this.__jobs.get(ref).run('cd ' + branch_path + ' && ' + command, env_vars);
+            return this.__jobs.get(ref).run('cd ' + ref_path + ' && ' + command, env_vars);
         } else {
-            return this.__jobs.get(ref).run('cd ' + branch_path + ' && ' + command, env_vars);
+            return this.__jobs.get(ref).run('cd ' + ref_path + ' && ' + command, env_vars);
         }
     }
 
@@ -176,24 +173,22 @@ function Repo({user, oauth_token, name, organization} = {}){
         }
 
         this.__synchronizing = true;
-        refObj = ref.split('/');
-        let branch = refObj[refObj.length - 1]
         this.__path = '/var/tmp/' + this.__name;
         this.__oauth_token = oauth_token;
 
-        branch_path = this.__path + '/' + branch + '/';
+        ref_path = this.__path + '/' + ref + '/';
         if ( ! fs.existsSync(this.__path)) {
             fs.mkdirSync(this.__path);
         }
-        if ( ! fs.existsSync(branch_path)) {
-            fs.mkdirSync(branch_path);
+        if ( ! fs.existsSync(ref_path)) {
+            fs.mkdirSync(ref_path);
         }
         let resp = await this.__getFile(tree_url);
         if(resp.error){
             console.log("Error getting tree object from github: " + resp.error)
         }
         try{
-            this.__sync_proc = this.__recursiveBuild(JSON.parse(resp.body), branch_path);
+            this.__sync_proc = this.__recursiveBuild(JSON.parse(resp.body), ref_path);
             let res = await this.__sync_proc;
             this.__synchronizing = false;
             console.log(res);
@@ -282,7 +277,7 @@ function User({oauth_token, username, organization} = {}) {
         return this.__repos.get(repoName).runJob(command, env_vars, ref);
     }
 
-    this.updateStatus = ({repoName, ref, sha, status, url} = {}, callback) => {
+    this.updateStatus = ({repoName, sha, status, url} = {}, callback) => {
         var desc;
         switch(status){
             case 'success':
