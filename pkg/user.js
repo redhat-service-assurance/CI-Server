@@ -28,7 +28,7 @@ function Job(){
     var __process;
     var __is_running;
 
-    this.run = (command, env_vars) => {
+    this.run = (command, timeout, env_vars) => {
         __process = child_process.exec(command, {detached: true, env: env_vars, shell: '/bin/bash'});
         __is_running = true;
         var data = "";
@@ -42,6 +42,15 @@ function Job(){
         });
 
         return new Promise( (resolve, reject) => {
+            setTimeout(function() {
+                console.log("Process timed out")
+                data += "\nTimed out after " + timeout + "seconds\n";
+                resolve({
+                    code: 2,
+                    data: data 
+                });
+            }, timeout * 1000);
+
             __process.on('close', (code) => {
                 __is_running = false;
                 resolve({
@@ -96,15 +105,14 @@ function Repo({user, oauth_token, name, organization} = {}){
         }
     }
 
-    this.runJob = (command, env_vars, ref) => {
+    this.runJob = (command, env_vars, ref, timeout) => {
         let ref_path = this.__path + '/' + ref;
 
         if(!this.__jobs.has(ref)) {
             this.__jobs.set(ref, new Job());
-            return this.__jobs.get(ref).run('cd ' + ref_path + ' && ' + command, env_vars);
-        } else {
-            return this.__jobs.get(ref).run('cd ' + ref_path + ' && ' + command, env_vars);
         }
+
+        return this.__jobs.get(ref).run('cd ' + ref_path + ' && ' + command, timeout, env_vars);
     }
 
     this.__getFile = (url) => {
@@ -273,8 +281,8 @@ function User({oauth_token, username, organization} = {}) {
     }
 
     // run command in repo
-    this.runInRepo = ({repoName, command, env_vars, ref} = {}) => {
-        return this.__repos.get(repoName).runJob(command, env_vars, ref);
+    this.runInRepo = ({repoName, command, env_vars, ref, timeout} = {}) => {
+        return this.__repos.get(repoName).runJob(command, env_vars, ref, timeout);
     }
 
     this.updateStatus = ({repoName, sha, status, url} = {}, callback) => {

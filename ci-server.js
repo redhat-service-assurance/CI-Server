@@ -33,7 +33,8 @@ async function runScript({script, repoName, ref, ocp_project} = {}){
         repoName: repoName,
         command: complete_comm,
         ref: ref,
-        env_vars: env_clone 
+        env_vars: env_clone,
+        timeout: 600 
     });
 }
 
@@ -89,10 +90,13 @@ async function execJob(chunkObj) {
         repoName: chunkObj.repository.name,
         ref: refSanitized, 
         ocp_project: chunkObj.after
-    });
+    })
 
     let end_status = "";
-    if(results.code != 0) {
+    if(results.code == 2) {
+        await user.killRepoJob(chunkObj.repository.name, refSanitized);
+        end_status = "failure";
+    } else if(results.code != 0) {
         end_status = "failure";
     } else {
         end_status = "success";
@@ -110,6 +114,10 @@ async function execJob(chunkObj) {
         ref: refSanitized,
         ocp_project: chunkObj.after
     });
+
+    if(asResults.code == 2) { //timeout
+        await user.killRepoJob(chunkObj.repository.name, refSanitized);
+    }
 
     user.postGist("******Script results******\n" + results.data + "\n\n******After Scripts******\n" + asResults.data, (error, url) => {
         if(error) {
