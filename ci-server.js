@@ -34,7 +34,7 @@ async function runScript({script, repoName, ref, ocp_project} = {}){
         command: complete_comm,
         ref: ref,
         env_vars: env_clone,
-        timeout: 1200 
+        timeout: 1800 
     });
 }
 
@@ -147,6 +147,9 @@ async function execJob(chunkObj) {
 app.post('/commit', (req, res) => {
     req.on('data', (chunk) => {
         chunkObj = JSON.parse(chunk);
+	if(chunkObj.after == "0000000000000000000000000000000000000000"){
+		return
+	}
         execJob(chunkObj);
     });
 });
