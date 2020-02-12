@@ -27,6 +27,7 @@ function runCommand(command, env_vars) {
 function Job(){
     var __process;
     var __is_running;
+    var __timeout;
 
     this.run = (command, timeout, env_vars) => {
         __process = child_process.exec(command, {detached: true, env: env_vars, shell: '/bin/bash'});
@@ -42,7 +43,7 @@ function Job(){
         });
 
         return new Promise( (resolve, reject) => {
-            setTimeout(function() {
+            __timeout = setTimeout(function() {
                 console.log("Process timed out")
                 data += "\nTimed out after " + timeout + "seconds\n";
                 resolve({
@@ -52,6 +53,7 @@ function Job(){
             }, timeout * 1000);
 
             __process.on('close', (code) => {
+                clearTimeout(__timeout);
                 __is_running = false;
                 resolve({
                     code: code,

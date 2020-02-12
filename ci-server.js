@@ -24,7 +24,7 @@ async function runScript({script, repoName, ref, ocp_project} = {}){
     env_clone.OCP_PROJECT = ocp_project;
     env_clone.HOME = '/var/tmp/' + repoName + '/' + ref;
 
-    let complete_comm = "";
+    let complete_comm = "set -e;";
     for (let comm of script) {
         complete_comm += comm + ';'
     }
