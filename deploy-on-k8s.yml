@@ -20,18 +20,18 @@ spec:
       containers:
       - name: ci-server
         image: <<image_path>>
-        command:
-        - /root/start.sh
         volumeMounts:
         - name: tmp
           mountPath: /.kube
         env:
         - name: OAUTH_TOKEN
-          value: <token>
+          value: <<token>>
         - name: GITHUB_USER
-          value: <user>
+          value: <<user>>
         - name: ORGANIZATION
           value: redhat-service-assurance
+        - name: WEBHOOK_PROXY
+          value: <<url>>
         ports:
         - containerPort: 3000
       initContainers:

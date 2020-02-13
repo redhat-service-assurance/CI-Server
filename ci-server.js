@@ -1,8 +1,7 @@
 const express = require('express'); 
-const request = require('request');
-const child_process = require('child_process');
 const User = require('./pkg/user');
-const { oauth_token, github_user, organization} = require('./pkg/config');
+const { oauth_token, github_user, organization, webhook_proxy } = require('./pkg/config');
+const SmeeClient = require('smee-client')
 const JobConf = require('./pkg/config-jobs');
 
 var app = express();
@@ -157,3 +156,13 @@ app.post('/commit', (req, res) => {
 var server = app.listen(3000, () => {
     console.log("Listening on port 3000 for github webhooks");
 })
+
+if(webhook_proxy){
+    const smee = new SmeeClient({
+    source: webhook_proxy,
+    target: 'http://localhost:3000/commit',
+    logger: console 
+    })
+
+    smee.start();
+}
