@@ -288,7 +288,7 @@ function User({oauth_token, username, organization} = {}) {
         return this.__repos.get(repoName).runJob(command, env_vars, ref, timeout);
     }
 
-    this.updateStatus = ({repoName, sha, status, url} = {}, callback) => {
+    this.updateStatus = ({repoName, sha, status, url} = {}) => {
         var desc;
         switch(status){
             case 'success':
@@ -301,7 +301,6 @@ function User({oauth_token, username, organization} = {}) {
                 desc = 'Running jobs';
                 break;
             default:
-                callback('Unrecognized status');
                 return;
         }
 
