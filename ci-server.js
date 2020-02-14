@@ -55,17 +55,12 @@ async function execJob(chunkObj) {
         })       
     });
     
-    // sync new changes to local repo, kill any previous syncs
-    let syncKilled = await user.syncRepo({
+    // sync new changes to local repo
+    await user.syncRepo({
         repoName: chunkObj.repository.name,
         ref: refSanitized,
         tree_sha: chunkObj.head_commit.tree_id
     });
-
-    if(syncKilled) {
-        console.log("Sync killed for " + chunkObj.after);
-        return
-    }
 
     // read in job config
     jobconf.clear();
