@@ -1,7 +1,8 @@
 const express = require('express'); 
 const User = require('./pkg/user');
 const { oauth_token, github_user, organization, webhook_proxy } = require('./pkg/config');
-const SmeeClient = require('smee-client')
+const SmeeClient = require('smee-client');
+const bodyParser = require('body-parser');
 const JobConf = require('./pkg/config-jobs');
 
 var app = express();
@@ -143,14 +144,29 @@ async function execJob(chunkObj) {
     });
 }
 
-app.post('/commit', (req, res) => {
-    req.on('data', (chunk) => {
-        chunkObj = JSON.parse(chunk);
-	if(chunkObj.after == "0000000000000000000000000000000000000000"){
-		return
-	}
-        execJob(chunkObj);
-    });
+app.use(bodyParser.json());
+
+app.post('/commit', (req) => {
+    try{
+        let event = req.headers['x-github-event'];
+        switch(event) {
+            case 'push':
+                let chunk = req.body;
+                if(chunk.after == "0000000000000000000000000000000000000000"){
+                    return
+                }
+                execJob(chunk);
+                break;
+            case 'pull_request':
+                console.log('Recieved PR event');
+                break;
+            default:
+                console.log('Unrecognized github event: ' + event)
+                break;
+        }
+    } catch(error) {
+        console.log('While parshing incoming message: ' + error);
+    }
 });
 
 var server = app.listen(3000, () => {
