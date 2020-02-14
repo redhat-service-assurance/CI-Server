@@ -46,9 +46,16 @@ async function execJob(chunkObj) {
     user.registerRepo(chunkObj.repository.name);
 
     // kill any previous jobs running in this repo
-    await user.killRepoJob(chunkObj.repository.name, refSanitized);
+    await user.killRepoJob(chunkObj.repository.name, refSanitized, () => {
+        user.updateStatus({
+            repoName: chunkObj.repository.name,
+            ref: refSanitized,
+            sha: chunkObj.after,
+            status: ''
+        })       
+    });
     
-    // sync new changes to local repo
+    // sync new changes to local repo, kill any previous syncs
     let syncKilled = await user.syncRepo({
         repoName: chunkObj.repository.name,
         ref: refSanitized,

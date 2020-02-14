@@ -63,7 +63,7 @@ function Job(){
         });
     }
 
-    this.kill = () => {
+    this.kill = (callback) => {
         if(__is_running) {
             console.log(__process.pid);
             __process.stdin.end();
@@ -80,6 +80,7 @@ function Job(){
                         code: code,
                         data: 'Job killed'
                     });
+                    callback();
                 });
             });
         }
@@ -101,9 +102,9 @@ function Repo({user, oauth_token, name, organization} = {}){
     this.__kill_sync = false;
     this.__sync_proc = null; 
 
-    this.killJob = (ref) => {
+    this.killJob = (ref, callback) => {
         if(this.__jobs.has(ref)) {
-            return this.__jobs.get(ref).kill();
+            return this.__jobs.get(ref).kill(callback);
         }
     }
 
@@ -254,9 +255,9 @@ function User({oauth_token, username, organization} = {}) {
         });
     };        
 
-    this.killRepoJob = (repoName, ref) => {
+    this.killRepoJob = (repoName, ref, callback) => {
         if(this.__repos.has(repoName)) {
-            return this.__repos.get(repoName).killJob(ref);
+            return this.__repos.get(repoName).killJob(ref, callback);
         }
     }
 
