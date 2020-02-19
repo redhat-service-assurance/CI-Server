@@ -83,7 +83,9 @@ async function execJob(chunkObj) {
         } else {
             console.log("[CI Server] Posted status 'pending' to repo " + chunkObj.repository.name);
         }
-    });
+    }).catch((err) => {
+        console.log("Failed to update status: " + err);
+    })
 
     //run scripts
     console.log("\n\nRunning Scripts");
@@ -142,7 +144,9 @@ async function execJob(chunkObj) {
             } else {
                 console.log("[CI Server] Posted status '" + end_status + "' to repo " + chunkObj.repository.name);
             }
-        });
+        }).catch((err) => {
+            console.log("Failed to update status: " + err);
+        })
     });
 }
 
