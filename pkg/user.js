@@ -140,7 +140,7 @@ function Repo({user, oauth_token, name, organization} = {}){
                 this.__file_write_processes.push(new Promise((resolve, reject) => {
                     this.__getFile(tree_branch.url).then((resp) => {
                         let blob = JSON.parse(resp.body).content
-                        let buff = new Buffer(blob, 'base64');
+                        let buff = new Buffer.from(blob, 'base64');
                         let text = buff.toString('ascii');
 
                         fs.writeFileSync(path + tree_branch.path, text, { flag: 'w' });
