@@ -63,7 +63,7 @@ function Job(){
         });
     }
 
-    this.kill = (callback) => {
+    this.kill = () => {
         if(__is_running) {
             console.log(__process.pid);
             __process.stdin.end();
@@ -80,7 +80,6 @@ function Job(){
                         code: code,
                         data: 'Job killed'
                     });
-                    callback();
                 });
             });
         }
@@ -311,7 +310,7 @@ function User({oauth_token, username, organization} = {}) {
                 'description': 'CI test results',
                 'public': true,
                 'files': {
-                    'results.txt': {
+                    'results.md': {
                         'content': text
                     }
                 }
@@ -326,21 +325,20 @@ function User({oauth_token, username, organization} = {}) {
        });
     }
 
-
     // finish setup
     this.getAuthStatus = () => {
         return this.request({
             method: 'GET',
         }).then((data) => {
-            if (data.response.headers.status == '403 Forbidden') {
-                throw "Error authenticating with github: " + data.body;
+            if( data.error ) {
+                throw 'Failed to connect to Github API with ' + data.error; 
             }
             if (data.response.headers.status != '200 OK') {
-                console.log('Warning: authorization failed with message: ' + response.headers.status);
+                throw 'Warning: authorization failed with message: ' + data.response.headers.status;
             } else {
                 console.log("User successfully authorized");
             }
-        })
+        });
     } 
 }
 module.exports = User 
