@@ -5,7 +5,7 @@
   "main": "ci-server.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node ci-server.js"
+    "start": "node --experimental-worker ci-server.js"
   },
   "repository": {
     "type": "git",
@@ -22,8 +22,10 @@
     "child_process": "^1.0.2",
     "express": "^4.17.1",
     "js-yaml": "^3.13.1",
+    "node-worker-threads-pool": "^1.1.2",
     "request": "^2.88.0",
     "simple-git": "^1.131.0",
-    "smee-client": "^1.1.0"
+    "smee-client": "^1.1.0",
+    "worker-threads": "^1.0.0"
   }
 }

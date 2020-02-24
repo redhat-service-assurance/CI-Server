@@ -32,6 +32,8 @@ spec:
           value: redhat-service-assurance
         - name: WEBHOOK_PROXY
           value: <<url>>
+        - name: WORKERS
+          value: <<int>>
         ports:
         - containerPort: 3000
       initContainers:
