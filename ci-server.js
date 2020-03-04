@@ -15,7 +15,11 @@ if(config.webhook_proxy){
         logger: console 
     })
 
-    smee.start();
+    const events = smee.start();
+
+    events.addEventListener('error', (error) => {
+        console.log("Error occurred with Smee client: " + error);
+    });
 }
 
 const pool = new StaticPool({

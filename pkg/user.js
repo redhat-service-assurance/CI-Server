@@ -142,7 +142,11 @@ function Repo({user, oauth_token, name, organization} = {}){
                         let buff = new Buffer.from(blob, 'base64');
                         let text = buff.toString('ascii');
 
-                        fs.writeFileSync(path + tree_branch.path, text, { flag: 'w' });
+                        try{
+                            fs.writeFileSync(path + tree_branch.path, text, { flag: 'w' });
+                        } catch(error) {
+                            console.log("Failed writing to file " + path + tree_branch.path + " with error " + error);
+                        }
 
                         comp = tree_branch.path.split('.');
                         console.log("Wrote to file: " + path + tree_branch.path);
@@ -155,7 +159,11 @@ function Repo({user, oauth_token, name, organization} = {}){
             } else if (tree_branch.type == 'tree' && ! this.__kill_sync ) {
                 console.log("Created directory: " + path + tree_branch.path);
                 if(! fs.existsSync(path + tree_branch.path) ) {
-                    fs.mkdirSync(path + tree_branch.path)
+                    try{
+                        fs.mkdirSync(path + tree_branch.path)
+                    } catch(error) {
+                        console.log("Failed to create directory " + path + tree_branch.path + " with error " + error);
+                    }
                 }
             }
         }
