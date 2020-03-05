@@ -39,8 +39,12 @@ app.post('/commit', (req) => {
             switch(event) {
                 case 'push':
                     if( req.body.after != "0000000000000000000000000000000000000000") {
-                        const res = await pool.exec(req.body);
-                        console.log('Job ended with status ' + res);
+                        try {
+                            const res = await pool.exec(req.body);
+                            console.log('Job ended with status ' + res);
+                        } catch(error) {
+                            console.log("Job failed with " + error);
+                        }
                     }
                     break;
                 case 'pull_request':
