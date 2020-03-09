@@ -20,6 +20,7 @@ if(config.webhook_proxy){
     events.addEventListener('error', (error) => {
         console.log("Error occurred with Smee client: ");
         console.log(error);
+	events = smee.start();	
     });
 }
 
