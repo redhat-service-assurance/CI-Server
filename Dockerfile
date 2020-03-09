@@ -1,8 +1,8 @@
 FROM centos
 ENV D=/root/
 
-ARG OC_LOC=https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest/openshift-client-linux-4.3.0.tar.gz 
-ARG OPERATOR_SDK_LOC=https://github.com/operator-framework/operator-sdk/releases/download/v0.12.0/operator-sdk-v0.12.0-x86_64-linux-gnu
+ARG OC_LOC=https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest/openshift-client-linux-4.3.0.tar.gz
+ARG OPERATOR_SDK_LOC=https://github.com/operator-framework/operator-sdk/releases/download/v0.15.2/operator-sdk-v0.15.2-x86_64-linux-gnu
 
 WORKDIR $D
 
@@ -26,4 +26,4 @@ RUN chown -R nobody:nobody .
 
 USER nobody
 
-ENTRYPOINT npm start 
+ENTRYPOINT npm start
