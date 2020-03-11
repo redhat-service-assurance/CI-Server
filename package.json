@@ -9,15 +9,15 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/pleimer/CI-Server.git"
+    "url": "git+https://github.com/infrawatch/CI-Server.git"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/pleimer/CI-Server/issues"
+    "url": "https://github.com/infrawatch/CI-Server/issues"
   },
-  "homepage": "https://github.com/pleimer/CI-Server#readme",
+  "homepage": "https://github.com/infrawatch/CI-Server#readme",
   "dependencies": {
     "child_process": "^1.0.2",
     "errorhandler": "^1.5.1",
