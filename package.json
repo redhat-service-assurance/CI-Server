@@ -20,6 +20,7 @@
   "homepage": "https://github.com/pleimer/CI-Server#readme",
   "dependencies": {
     "child_process": "^1.0.2",
+    "errorhandler": "^1.5.1",
     "express": "^4.17.1",
     "js-yaml": "^3.13.1",
     "node-worker-threads-pool": "^1.1.2",
