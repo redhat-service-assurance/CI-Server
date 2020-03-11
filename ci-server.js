@@ -2,6 +2,7 @@ const express = require('express');
 const config = require('./pkg/config');
 const SmeeClient = require('smee-client');
 const bodyParser = require('body-parser');
+const errorhandler = require('errorhandler');
 const { StaticPool } = require("node-worker-threads-pool");
 
 console.log('Utilizing ' + config.workers + ' workers to process jobs.')
@@ -32,6 +33,7 @@ const pool = new StaticPool({
 var app = express();
 
 app.use(bodyParser.json());
+app.use(errorhandler({ dumpExceptions: true, showStack: true}));
 
 app.post('/commit', (req) => {
    (async ()=> {
